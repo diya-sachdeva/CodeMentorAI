@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log in — CodeMentor AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    .auth-page {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+    }
+
+    .auth-box {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .auth-box__header { text-align: center; margin-bottom: 32px; }
+
+    .auth-box__logo {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 20px;
+      display: block;
+      text-decoration: none;
+    }
+
+    .auth-box h1 { font-size: 1.75rem; margin-bottom: 8px; }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .auth-footer a { color: var(--accent); text-decoration: none; }
+    .auth-footer a:hover { text-decoration: underline; }
+
+    .error-msg {
+      background: rgba(255, 92, 92, 0.1);
+      border: 1px solid rgba(255, 92, 92, 0.3);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 0.875rem;
+      color: var(--red);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="/" class="nav__logo"><span>&gt;_</span> CodeMentor AI</a>
+      <ul class="nav__links">
+        <li><a href="/signup">Create account</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="auth-page">
+    <div class="auth-box">
+      <div class="auth-box__header">
+        <h1>Welcome back</h1>
+        <p>Log in to continue practicing</p>
+      </div>
+
+      <div class="card">
+        <div id="error-msg" class="error-msg"></div>
+        <form class="auth-form" id="login-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="you@example.com" required autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="btn btn--primary btn--full btn--lg" id="submit-btn">
+            Log in
+          </button>
+        </form>
+      </div>
+
+      <div class="auth-footer">
+        Don't have an account? <a href="/signup">Sign up</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <script src="/static/js/main.js"></script>
+  <script>
+    redirectIfAuthed();
+
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("submit-btn");
+      const errEl = document.getElementById("error-msg");
+      errEl.style.display = "none";
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Logging in…';
+
+      try {
+        const data = await api("POST", "/api/login", {
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value,
+        });
+        showToast(`Welcome back, ${data.name}!`, "success");
+        setTimeout(() => window.location.href = "/dashboard", 800);
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Log in";
+      }
+    });
+  </script>
+</body>
+</html>

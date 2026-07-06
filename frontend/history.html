@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>History — CodeMentor AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    .detail-panel {
+      display: none;
+      margin-top: 24px;
+    }
+
+    .detail-panel.active { display: block; }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .q-block {
+      margin-bottom: 24px;
+    }
+
+    .q-block__question {
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.83rem;
+      line-height: 1.8;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-bottom: 12px;
+    }
+
+    .q-block__answer {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.8;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="/dashboard" class="nav__logo"><span>&gt;_</span> CodeMentor AI</a>
+      <ul class="nav__links">
+        <li><a href="/interview" class="btn btn--primary" style="padding:7px 16px;">New interview</a></li>
+        <li><a href="/dashboard" class="btn btn--ghost" style="padding:7px 14px;">Dashboard</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+      <div class="page-header">
+        <div class="page-header__eyebrow">Interview history</div>
+        <h1>All sessions</h1>
+      </div>
+
+      <div id="loading" class="loading-state"><span class="spinner"></span> Loading…</div>
+
+      <div id="content" style="display:none;">
+        <!-- List -->
+        <div class="card" id="list-card" style="padding:0; overflow:hidden;"></div>
+
+        <!-- Detail panel (shown when ?id= is set or row clicked) -->
+        <div class="detail-panel" id="detail-panel">
+          <div class="detail-header">
+            <div>
+              <div class="page-header__eyebrow">Interview detail</div>
+              <h2 id="detail-title">—</h2>
+            </div>
+            <button class="btn btn--ghost" onclick="closeDetail()">✕ Close</button>
+          </div>
+          <div id="detail-content"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+  <script src="/static/js/main.js"></script>
+  <script>
+    requireAuth();
+
+    let allInterviews = [];
+
+    async function loadHistory() {
+      try {
+        allInterviews = await api("GET", "/api/history");
+
+        const listEl = document.getElementById("list-card");
+
+        if (!allInterviews.length) {
+          listEl.innerHTML = `
+            <div class="empty-state">
+              <h3>No interviews yet</h3>
+              <p>Complete your first interview to see history here.</p>
+              <a href="/interview" class="btn btn--primary" style="margin-top:16px;">Start now</a>
+            </div>`;
+        } else {
+          listEl.innerHTML = `
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Company</th>
+                    <th>Topic</th>
+                    <th>Difficulty</th>
+                    <th>Score</th>
+                    <th>Date</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${allInterviews.map(iv => `
+                    <tr style="cursor:pointer;" onclick="loadDetail(${iv.id})">
+                      <td class="mono" style="color:var(--text-muted)">${iv.id}</td>
+                      <td>${iv.company}</td>
+                      <td>${iv.topic}</td>
+                      <td>${difficultyBadge(iv.difficulty)}</td>
+                      <td>
+                        <span class="mono" style="font-weight:600; color:${iv.score != null ? scoreColor(iv.score) : 'var(--text-muted)'}">
+                          ${iv.score != null ? iv.score : '—'}
+                        </span>
+                      </td>
+                      <td style="color:var(--text-muted)">${iv.started_at}</td>
+                      <td><a class="btn btn--ghost" style="padding:5px 12px; font-size:0.8rem;">View →</a></td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>`;
+        }
+
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("content").style.display = "block";
+
+        // Auto-open if ?id= in URL
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get("id");
+        if (id) loadDetail(parseInt(id));
+
+      } catch {
+        window.location.href = "/login";
+      }
+    }
+
+    async function loadDetail(id) {
+      const panel = document.getElementById("detail-panel");
+      const contentEl = document.getElementById("detail-content");
+
+      panel.classList.add("active");
+      contentEl.innerHTML = `<div class="loading-state"><span class="spinner"></span> Loading…</div>`;
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      try {
+        const iv = await api("GET", `/api/history/${id}`);
+
+        document.getElementById("detail-title").textContent =
+          `${iv.company} — ${iv.topic} (${iv.difficulty})`;
+
+        const questions = iv.questions;
+
+        contentEl.innerHTML = `
+          <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+            <span class="badge badge--accent">${iv.score != null ? iv.score + ' / 100' : 'Incomplete'}</span>
+            ${difficultyBadge(iv.difficulty)}
+            <span style="font-size:0.8rem; color:var(--text-muted); align-self:center;">${iv.started_at}</span>
+          </div>
+
+          ${questions.length === 0 ? '<p style="color:var(--text-muted);">No questions recorded.</p>' :
+            questions.map((q, i) => `
+              <div class="q-block card" style="margin-bottom:16px;">
+                <div style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono); margin-bottom:12px;">Q${i+1}</div>
+                <div class="q-block__question">${q.question}</div>
+
+                ${q.answer ? `
+                  <div style="font-size:0.75rem; color:var(--text-muted); margin: 12px 0 6px;">Your answer</div>
+                  <div class="q-block__answer">${q.answer}</div>
+                ` : ''}
+
+                ${q.score != null ? `
+                  <div style="margin-top:16px;">
+                    <div class="eval-grid" style="margin-top:8px;">
+                      <div class="eval-item">
+                        <div class="eval-item__label">Score</div>
+                        <div class="eval-item__value" style="color:${scoreColor(q.score)};">${q.score}</div>
+                      </div>
+                      <div class="eval-item">
+                        <div class="eval-item__label">Correctness</div>
+                        <div class="eval-item__assessment">${assessmentBadge(q.correctness)}</div>
+                      </div>
+                      <div class="eval-item">
+                        <div class="eval-item__label">Time Complexity</div>
+                        <div class="eval-item__value mono">${q.time_complexity || '—'}</div>
+                      </div>
+                      <div class="eval-item">
+                        <div class="eval-item__label">Space Complexity</div>
+                        <div class="eval-item__value mono">${q.space_complexity || '—'}</div>
+                      </div>
+                    </div>
+                    ${q.feedback ? `<div style="margin-top:12px; font-size:0.88rem; color:var(--text-secondary); line-height:1.7;">${q.feedback}</div>` : ''}
+                    ${q.optimal_solution ? `
+                      <div style="margin-top:16px; font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">Optimal solution</div>
+                      <div class="code-block">${q.optimal_solution}</div>
+                    ` : ''}
+                  </div>
+                ` : ''}
+              </div>
+            `).join("")
+          }
+        `;
+
+      } catch (err) {
+        contentEl.innerHTML = `<p style="color:var(--red);">${err.message}</p>`;
+      }
+    }
+
+    function closeDetail() {
+      document.getElementById("detail-panel").classList.remove("active");
+      window.history.replaceState({}, "", "/history");
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — CodeMentor AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <style>
+    .dashboard-header {
+      padding: 40px 0 32px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .greeting {
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .recent-table-wrap {
+      margin-top: 32px;
+    }
+
+    .score-pill {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .weak-topic-card {
+      background: rgba(245, 166, 35, 0.06);
+      border-color: rgba(245, 166, 35, 0.25);
+    }
+    .weak-topic-card .stat-card__value { color: var(--yellow); }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav__inner">
+      <a href="/" class="nav__logo"><span>&gt;_</span> CodeMentor AI</a>
+      <ul class="nav__links">
+        <li><a href="/history">History</a></li>
+        <li><a href="#" onclick="logout(); return false;" class="btn btn--ghost" style="padding:7px 14px;">Log out</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+      <div id="loading" class="loading-state">
+        <span class="spinner"></span>
+        <span>Loading your dashboard…</span>
+      </div>
+
+      <div id="content" style="display: none;">
+        <div class="dashboard-header">
+          <div>
+            <div class="greeting" id="greeting-time">Good morning</div>
+            <h1 id="user-name">—</h1>
+          </div>
+          <a href="/interview" class="btn btn--primary btn--lg">Start interview →</a>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-interviews">—</div>
+            <div class="stat-card__label">Total interviews</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__value" id="stat-avg" style="color: var(--green);">—</div>
+            <div class="stat-card__label">Average score</div>
+          </div>
+          <div class="stat-card weak-topic-card" id="weak-card">
+            <div class="stat-card__value" id="stat-weak">—</div>
+            <div class="stat-card__label">Needs work</div>
+          </div>
+        </div>
+
+        <div class="recent-table-wrap">
+          <div class="section-title">Recent interviews</div>
+          <div class="card" style="padding: 0; overflow: hidden;" id="recent-card">
+            <div id="recent-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+  <script src="/static/js/main.js"></script>
+  <script>
+    const hour = new Date().getHours();
+    document.getElementById("greeting-time").textContent =
+      hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+    async function loadDashboard() {
+      try {
+        const data = await api("GET", "/api/dashboard");
+
+        document.getElementById("user-name").textContent = data.name;
+        document.getElementById("stat-interviews").textContent = data.total_interviews;
+        document.getElementById("stat-avg").textContent =
+          data.average_score > 0 ? data.average_score : "—";
+        document.getElementById("stat-weak").textContent =
+          data.weak_topic !== "N/A" ? data.weak_topic : "—";
+
+        const recentEl = document.getElementById("recent-content");
+
+        if (!data.recent_interviews.length) {
+          recentEl.innerHTML = `
+            <div class="empty-state">
+              <h3>No interviews yet</h3>
+              <p>Start your first interview to see your history here.</p>
+              <a href="/interview" class="btn btn--primary" style="margin-top: 16px;">Start now</a>
+            </div>`;
+        } else {
+          recentEl.innerHTML = `
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Company</th>
+                    <th>Topic</th>
+                    <th>Difficulty</th>
+                    <th>Score</th>
+                    <th>Date</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.recent_interviews.map((iv, i) => `
+                    <tr>
+                      <td class="mono" style="color:var(--text-muted)">${iv.id}</td>
+                      <td>${iv.company}</td>
+                      <td>${iv.topic}</td>
+                      <td>${difficultyBadge(iv.difficulty)}</td>
+                      <td>
+                        <span class="score-pill" style="color: ${iv.score != null ? scoreColor(iv.score) : 'var(--text-muted)'}">
+                          ${iv.score != null ? iv.score : '—'}
+                        </span>
+                      </td>
+                      <td style="color:var(--text-muted)">${iv.started_at}</td>
+                      <td>
+                        <a href="/history?id=${iv.id}" class="btn btn--ghost" style="padding:5px 12px; font-size:0.8rem;">View</a>
+                      </td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>`;
+        }
+
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("content").style.display = "block";
+
+      } catch (err) {
+        window.location.href = "/login";
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
