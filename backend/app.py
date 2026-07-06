@@ -15,9 +15,10 @@ from backend.auth import hash_password, verify_password, create_token, get_curre
 from backend.ai import generate_question, evaluate_answer, evaluate_followup, get_weak_topic
 
 app = FastAPI(title="CodeMentor AI")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="frontend")
-
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend"))
 
 # ─── Error handlers ───────────────────────────────────────────────────────────
 
